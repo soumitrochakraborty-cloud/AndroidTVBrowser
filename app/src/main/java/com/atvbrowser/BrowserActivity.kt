@@ -55,6 +55,7 @@ class BrowserActivity : AppCompatActivity() {
         val refreshIntervalSec = prefs.getInt(SetupActivity.KEY_REFRESH_INTERVAL, 60)
         refreshIntervalMs = refreshIntervalSec * 1000L
         isKioskMode = prefs.getBoolean(SetupActivity.KEY_KIOSK_MODE, true)
+        zoomPercent = prefs.getInt("zoom_percent", 100)
 
         webView = findViewById(R.id.webView)
         overlayBar = findViewById(R.id.overlayBar)
@@ -115,6 +116,8 @@ class BrowserActivity : AppCompatActivity() {
                 progressBar.progress = 100
                 currentUrl = url ?: currentUrl
                 urlDisplay.text = currentUrl
+                // Reapply zoom after every page load (viewport resets on navigation)
+                applyZoom()
             }
 
             override fun onReceivedError(
@@ -177,11 +180,33 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
-    // Zoom via WebView textZoom — reflowing the actual page content
+    // Zoom by changing viewport width — forces page to reflow at new size
     private fun applyZoom() {
+        // Calculate effective viewport width based on zoom
+        // At 100% = device width, at 50% = double width (zoomed out), at 200% = half width (zoomed in)
+        val displayMetrics = resources.displayMetrics
+        val deviceWidth = displayMetrics.widthPixels
+        val density = displayMetrics.density
+        val deviceWidthDp = (deviceWidth / density).toInt()
+        val viewportWidth = (deviceWidthDp * 100.0 / zoomPercent).toInt()
+
+        val js = """
+            (function() {
+                var viewport = document.querySelector('meta[name=viewport]');
+                if (!viewport) {
+                    viewport = document.createElement('meta');
+                    viewport.name = 'viewport';
+                    document.head.appendChild(viewport);
+                }
+                viewport.content = 'width=$viewportWidth, initial-scale=1.0';
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js, null)
+        // Also set textZoom for text scaling
         webView.settings.textZoom = zoomPercent
-        // Also set initial scale so layout reflows properly
-        webView.setInitialScale(zoomPercent)
+        // Persist zoom level
+        getSharedPreferences(SetupActivity.PREFS_NAME, Context.MODE_PRIVATE).edit()
+            .putInt("zoom_percent", zoomPercent).apply()
     }
 
     private fun updateZoomLabel() {
