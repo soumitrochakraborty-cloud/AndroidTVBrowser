@@ -60,7 +60,7 @@ class SetupActivity : AppCompatActivity() {
         statusText = findViewById(R.id.statusText)
 
         // Load saved values if any
-        urlInput.setText(prefs.getString(KEY_URL, "https://"))
+        urlInput.setText(prefs.getString(KEY_URL, "https://atimotorssupport.zendesk.com/explore/studio#/dashboards/79EC2E8A2B0ED1F3604B3117E9C8A2FF23A7559BEE379B4758055F19466EE05B"))
         kioskSwitch.isChecked = prefs.getBoolean(KEY_KIOSK_MODE, true)
 
         // Setup refresh interval spinner
