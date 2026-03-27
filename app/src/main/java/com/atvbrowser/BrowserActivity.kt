@@ -41,7 +41,7 @@ class BrowserActivity : AppCompatActivity() {
     // Zoom: 50% to 200% in 10% steps
     private var zoomPercent: Int = 100
     private val ZOOM_STEP = 10
-    private val ZOOM_MIN = 10
+    private val ZOOM_MIN = 50
     private val ZOOM_MAX = 200
 
     companion object {
@@ -105,7 +105,7 @@ class BrowserActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
-            userAgentString = "Mozilla/5.0 (Linux; Android 9; AndroidTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            userAgentString = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
 
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -122,7 +122,19 @@ class BrowserActivity : AppCompatActivity() {
                 progressBar.progress = 100
                 currentUrl = url ?: currentUrl
                 urlDisplay.text = currentUrl
-                // Reapply zoom after every page load (viewport resets on navigation)
+                // Force desktop-width viewport so dashboard shows all columns
+                webView.evaluateJavascript("""
+                    (function() {
+                        var meta = document.querySelector('meta[name=viewport]');
+                        if (!meta) {
+                            meta = document.createElement('meta');
+                            meta.name = 'viewport';
+                            document.head.appendChild(meta);
+                        }
+                        meta.content = 'width=2560, initial-scale=1.0';
+                    })();
+                """.trimIndent(), null)
+                // Reapply zoom after every page load
                 applyZoom()
             }
 
