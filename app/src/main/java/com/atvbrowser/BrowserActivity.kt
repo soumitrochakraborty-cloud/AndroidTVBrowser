@@ -41,7 +41,7 @@ class BrowserActivity : AppCompatActivity() {
     // Zoom: 50% to 200% in 10% steps
     private var zoomPercent: Int = 100
     private val ZOOM_STEP = 10
-    private val ZOOM_MIN = 50
+    private val ZOOM_MIN = 10
     private val ZOOM_MAX = 200
 
     companion object {
