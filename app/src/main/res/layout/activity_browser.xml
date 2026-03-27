@@ -30,6 +30,48 @@
         android:indeterminateTint="#FFFFFF"
         android:visibility="gone" />
 
+    <!-- Floating Zoom Panel - always visible on right side -->
+    <LinearLayout
+        android:id="@+id/zoomPanel"
+        android:layout_width="48dp"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_vertical|end"
+        android:layout_marginEnd="8dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:background="#CC0D1117"
+        android:padding="4dp"
+        android:elevation="10dp">
+
+        <ImageButton
+            android:id="@+id/btnFloatZoomIn"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/arrow_up_float"
+            android:background="@drawable/icon_button_bg"
+            android:contentDescription="Zoom In"
+            android:layout_marginBottom="4dp" />
+
+        <TextView
+            android:id="@+id/floatZoomLevel"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="100%"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp"
+            android:gravity="center"
+            android:layout_marginBottom="4dp" />
+
+        <ImageButton
+            android:id="@+id/btnFloatZoomOut"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/arrow_down_float"
+            android:background="@drawable/icon_button_bg"
+            android:contentDescription="Zoom Out" />
+
+    </LinearLayout>
+
     <!-- Overlay Control Bar -->
     <LinearLayout
         android:id="@+id/overlayBar"
