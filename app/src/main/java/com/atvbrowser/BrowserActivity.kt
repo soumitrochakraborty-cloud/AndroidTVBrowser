@@ -27,9 +27,6 @@ class BrowserActivity : AppCompatActivity() {
     private lateinit var btnZoomIn: ImageButton
     private lateinit var btnZoomOut: ImageButton
     private lateinit var zoomLevelText: TextView
-    private lateinit var btnFloatZoomIn: ImageButton
-    private lateinit var btnFloatZoomOut: ImageButton
-    private lateinit var floatZoomLevel: TextView
 
     private var countDownTimer: CountDownTimer? = null
     private var refreshIntervalMs: Long = 0
@@ -72,9 +69,6 @@ class BrowserActivity : AppCompatActivity() {
         btnZoomIn = findViewById(R.id.btnZoomIn)
         btnZoomOut = findViewById(R.id.btnZoomOut)
         zoomLevelText = findViewById(R.id.zoomLevelText)
-        btnFloatZoomIn = findViewById(R.id.btnFloatZoomIn)
-        btnFloatZoomOut = findViewById(R.id.btnFloatZoomOut)
-        floatZoomLevel = findViewById(R.id.floatZoomLevel)
 
         if (isKioskMode) {
             window.decorView.systemUiVisibility = (
@@ -105,7 +99,7 @@ class BrowserActivity : AppCompatActivity() {
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
-            userAgentString = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            userAgentString = "Mozilla/5.0 (Linux; Android 9; AndroidTV) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         }
 
         webView.setLayerType(View.LAYER_TYPE_HARDWARE, null)
@@ -122,19 +116,7 @@ class BrowserActivity : AppCompatActivity() {
                 progressBar.progress = 100
                 currentUrl = url ?: currentUrl
                 urlDisplay.text = currentUrl
-                // Force desktop-width viewport so dashboard shows all columns
-                webView.evaluateJavascript("""
-                    (function() {
-                        var meta = document.querySelector('meta[name=viewport]');
-                        if (!meta) {
-                            meta = document.createElement('meta');
-                            meta.name = 'viewport';
-                            document.head.appendChild(meta);
-                        }
-                        meta.content = 'width=2560, initial-scale=1.0';
-                    })();
-                """.trimIndent(), null)
-                // Reapply zoom after every page load
+                // Reapply zoom after every page load (viewport resets on navigation)
                 applyZoom()
             }
 
@@ -168,31 +150,23 @@ class BrowserActivity : AppCompatActivity() {
 
         btnZoomIn.setOnClickListener {
             if (zoomPercent < ZOOM_MAX) {
-                zoomIn()
+                zoomPercent += ZOOM_STEP
+                applyZoom()
+                updateZoomLabel()
                 scheduleOverlayHide()
             }
         }
 
         btnZoomOut.setOnClickListener {
             if (zoomPercent > ZOOM_MIN) {
-                zoomOut()
+                zoomPercent -= ZOOM_STEP
+                applyZoom()
+                updateZoomLabel()
                 scheduleOverlayHide()
             }
         }
 
         // Tap anywhere on WebView to show overlay (for phone users)
-        btnFloatZoomIn.setOnClickListener {
-            if (zoomPercent < ZOOM_MAX) {
-                zoomIn()
-            }
-        }
-
-        btnFloatZoomOut.setOnClickListener {
-            if (zoomPercent > ZOOM_MIN) {
-                zoomOut()
-            }
-        }
-
         webView.setOnTouchListener { _, event ->
             if (event.action == android.view.MotionEvent.ACTION_UP) {
                 if (!overlayVisible) showOverlay()
@@ -206,48 +180,37 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
-    // Native WebView zoom — exactly like Chrome Ctrl+/- zoom
+    // Zoom by changing viewport width — forces page to reflow at new size
     private fun applyZoom() {
-        // Enable zoom support
-        webView.settings.builtInZoomControls = true
-        webView.settings.setSupportZoom(true)
-        webView.settings.displayZoomControls = false
-        webView.settings.useWideViewPort = true
-        webView.settings.loadWithOverviewMode = true
+        // Calculate effective viewport width based on zoom
+        // At 100% = device width, at 50% = double width (zoomed out), at 200% = half width (zoomed in)
+        val displayMetrics = resources.displayMetrics
+        val deviceWidth = displayMetrics.widthPixels
+        val density = displayMetrics.density
+        val deviceWidthDp = (deviceWidth / density).toInt()
+        val viewportWidth = (deviceWidthDp * 100.0 / zoomPercent).toInt()
 
-        // Set the zoom level using setInitialScale (100 = 100%, 50 = 50%, etc.)
-        webView.setInitialScale(zoomPercent)
-
+        val js = """
+            (function() {
+                var viewport = document.querySelector('meta[name=viewport]');
+                if (!viewport) {
+                    viewport = document.createElement('meta');
+                    viewport.name = 'viewport';
+                    document.head.appendChild(viewport);
+                }
+                viewport.content = 'width=$viewportWidth, initial-scale=1.0';
+            })();
+        """.trimIndent()
+        webView.evaluateJavascript(js, null)
+        // Also set textZoom for text scaling
+        webView.settings.textZoom = zoomPercent
         // Persist zoom level
         getSharedPreferences(SetupActivity.PREFS_NAME, Context.MODE_PRIVATE).edit()
             .putInt("zoom_percent", zoomPercent).apply()
     }
 
-    // Zoom in using native WebView method
-    private fun zoomIn() {
-        if (zoomPercent < ZOOM_MAX) {
-            zoomPercent += ZOOM_STEP
-            webView.zoomIn()
-            getSharedPreferences(SetupActivity.PREFS_NAME, Context.MODE_PRIVATE).edit()
-                .putInt("zoom_percent", zoomPercent).apply()
-            updateZoomLabel()
-        }
-    }
-
-    // Zoom out using native WebView method
-    private fun zoomOut() {
-        if (zoomPercent > ZOOM_MIN) {
-            zoomPercent -= ZOOM_STEP
-            webView.zoomOut()
-            getSharedPreferences(SetupActivity.PREFS_NAME, Context.MODE_PRIVATE).edit()
-                .putInt("zoom_percent", zoomPercent).apply()
-            updateZoomLabel()
-        }
-    }
-
     private fun updateZoomLabel() {
         zoomLevelText.text = "$zoomPercent%"
-        floatZoomLevel.text = "$zoomPercent%"
     }
 
     private fun loadUrl(url: String) {
@@ -400,59 +363,32 @@ class BrowserActivity : AppCompatActivity() {
             // Volume keys = zoom on phone
             KeyEvent.KEYCODE_VOLUME_UP -> {
                 if (zoomPercent < ZOOM_MAX) {
-                    zoomIn()
+                    zoomPercent += ZOOM_STEP
+                    applyZoom()
                     showOverlay()
                 }
                 true
             }
             KeyEvent.KEYCODE_VOLUME_DOWN -> {
                 if (zoomPercent > ZOOM_MIN) {
-                    zoomOut()
+                    zoomPercent -= ZOOM_STEP
+                    applyZoom()
                     showOverlay()
                 }
                 true
             }
-            // Channel / Page keys = zoom on TV remote
             KeyEvent.KEYCODE_CHANNEL_UP, KeyEvent.KEYCODE_PAGE_UP -> {
                 if (zoomPercent < ZOOM_MAX) {
-                    zoomIn()
+                    zoomPercent += ZOOM_STEP
+                    applyZoom()
                     showOverlay()
                 }
                 true
             }
             KeyEvent.KEYCODE_CHANNEL_DOWN, KeyEvent.KEYCODE_PAGE_DOWN -> {
                 if (zoomPercent > ZOOM_MIN) {
-                    zoomOut()
-                    showOverlay()
-                }
-                true
-            }
-            // Keyboard + and - keys = zoom (for USB keyboard connected to TV)
-            KeyEvent.KEYCODE_PLUS, KeyEvent.KEYCODE_EQUALS -> {
-                if (zoomPercent < ZOOM_MAX) {
-                    zoomIn()
-                    showOverlay()
-                }
-                true
-            }
-            KeyEvent.KEYCODE_MINUS -> {
-                if (zoomPercent > ZOOM_MIN) {
-                    zoomOut()
-                    showOverlay()
-                }
-                true
-            }
-            // Numpad + and - 
-            KeyEvent.KEYCODE_NUMPAD_ADD -> {
-                if (zoomPercent < ZOOM_MAX) {
-                    zoomIn()
-                    showOverlay()
-                }
-                true
-            }
-            KeyEvent.KEYCODE_NUMPAD_SUBTRACT -> {
-                if (zoomPercent > ZOOM_MIN) {
-                    zoomOut()
+                    zoomPercent -= ZOOM_STEP
+                    applyZoom()
                     showOverlay()
                 }
                 true
